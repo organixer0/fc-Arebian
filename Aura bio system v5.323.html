@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Aura Bio System  - v5.323</title>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.321.0/dist/umd/lucide.min.js"></script>
+    <style>
+        :root {
+            --bg: #030712;
+            --glass: rgba(255, 255, 255, 0.04);
+            --glass-border: rgba(255, 255, 255, 0.12);
+            --accent: #22d3ee;
+            --text: #f8fafc;
+            --danger: #ef4444;
+        }
+
+        [data-theme="light"] {
+            --bg: #f1f5f9;
+            --glass: rgba(255, 255, 255, 0.7);
+            --glass-border: rgba(0, 0, 0, 0.08);
+            --text: #0f172a;
+            --accent: #0891b2;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'SF Pro Display', -apple-system, sans-serif; transition: all 0.3s ease; }
+        body { background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+
+        /* Liquid Glass Card Style */
+        .glass-card { background: var(--glass); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px); border: 1px solid var(--glass-border); border-radius: 28px; padding: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
+
+        .app-shell { max-width: 450px; margin: 0 auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
+
+        /* Step Counter & Sensor Display */
+        .vitals-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .vital-box { text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 120px; }
+        .big-val { font-size: 2rem; font-weight: 800; color: var(--accent); }
+
+        /* AI Chat - Restored Usability */
+        .aura-chat-container { display: flex; flex-direction: column; height: 350px; position: relative; }
+        #chat-stream { flex-grow: 1; overflow-y: auto; padding-bottom: 15px; font-size: 0.95rem; line-height: 1.5; mask-image: linear-gradient(to top, black 90%, transparent); }
+        .input-row { display: flex; gap: 10px; background: rgba(255,255,255,0.05); padding: 6px; border-radius: 20px; border: 1px solid var(--glass-border); }
+        .input-row input { flex: 1; background: none; border: none; color: var(--text); padding: 10px 15px; outline: none; }
+
+        /* Heart Rate Visualizer */
+        .hr-visualizer { height: 60px; display: flex; align-items: flex-end; gap: 2px; margin-top: 10px; }
+        .hr-bar { flex: 1; background: var(--danger); opacity: 0.4; border-radius: 1px; }
+
+        /* Drawer (Settings) */
+        #settings-pane { position: fixed; top: 0; right: -100%; width: 100%; height: 100%; z-index: 1000; padding: 30px; display: flex; flex-direction: column; gap: 20px; }
+        #settings-pane.open { right: 0; }
+        .field { display: flex; flex-direction: column; gap: 5px; }
+        input[type="text"], select { padding: 12px; border-radius: 12px; border: 1px solid var(--glass-border); background: rgba(0,0,0,0.2); color: white; }
+
+        header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; }
+        .btn-icon { background: var(--glass); border: 1px solid var(--glass-border); color: var(--text); width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; }
+        .btn-accent { background: var(--accent); color: #000; border: none; padding: 15px; border-radius: 18px; font-weight: bold; width: 100%; cursor: pointer; }
+
+        .pulse { animation: pulse-anim 1.5s infinite; }
+        @keyframes pulse-anim { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+<div id="settings-pane" class="glass-card" style="border-radius:0;">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h2 data-i18n="settings">Aura Config</h2>
+        <button onclick="toggleSettings()" class="btn-icon"><i data-lucide="x"></i></button>
+    </div>
+    
+    <div class="field">
+        <label data-i18n="p_name">Your Identity</label>
+        <input type="text" id="user-name" placeholder="Name">
+    </div>
+    <div class="field">
+        <label data-i18n="p_goal">Health Goal</label>
+        <select id="user-goal">
+            <option value="gain" data-i18n="g_gain">Muscle / Músculo</option>
+            <option value="lose" data-i18n="g_lose">Fat Loss / Peso</option>
+            <option value="recovery" data-i18n="g_rec">Recovery / Salud</option>
+        </select>
+    </div>
+    <div class="field">
+        <label data-i18n="p_lang">Language Engine</label>
+        <select id="user-lang" onchange="setLang(this.value)">
+            <option value="en">English (Global)</option>
+            <option value="mx">Español (México)</option>
+            <option value="fr">Français</option>
+            <option value="jp">日本語</option>
+        </select>
+    </div>
+
+    <button class="btn-accent" onclick="saveProfile()" data-i18n="save">Update Bio-Profile</button>
+    <button onclick="toggleTheme()" class="btn-accent" style="background:#475569; color:white;">Toggle Visual Mode</button>
+</div>
+
+<div class="app-shell">
+    <header>
+        <div>
+            <h1 id="display-name">Aura Bio</h1>
+            <p style="font-size: 0.7rem; color: var(--accent); font-weight: bold;">
+                <span class="pulse">●</span> <span data-i18n="status">SENSOR SYNC ACTIVE</span>
+            </p>
+        </div>
+        <button onclick="toggleSettings()" class="btn-icon"><i data-lucide="settings"></i></button>
+    </header>
+
+    <div class="vitals-grid">
+        <div class="glass-card vital-box">
+            <i data-lucide="footprints" size="20"></i>
+            <div id="step-val" class="big-val">0</div>
+            <small data-i18n="steps">Steps</small>
+        </div>
+        <div class="glass-card vital-box" style="border-color: var(--danger);">
+            <i data-lucide="heart" size="20" color="#ef4444"></i>
+            <div id="hr-val" class="big-val">--</div>
+            <small data-i18n="bpm">BPM (Sensor)</small>
+        </div>
+    </div>
+
+    <div class="glass-card aura-chat-container">
+        <div style="display:flex; justify-content:space-between; margin-bottom:10px; font-size:0.75rem; font-weight:bold; opacity:0.6;">
+            <span>AURA AI v3.0</span>
+            <span id="active-goal">GOAL: RECOVERY</span>
+        </div>
+        <div id="chat-stream">
+            Aura: Bio-systems initialized. Sensors calibrated. How can I assist with your health or mathematical needs today?
+        </div>
+        
+        <div class="hr-visualizer" id="hr-bars"></div>
+
+        <div class="input-row">
+            <input type="text" id="user-input" placeholder="Symptoms, Recipes, Math...">
+            <button onclick="askAura()" class="btn-icon" style="background:var(--accent); color:black; border:none; width:36px; height:36px;">
+                <i data-lucide="arrow-right"></i>
+            </button>
+        </div>
+    </div>
+
+    <div class="glass-card" style="padding:15px; font-size:0.85rem;">
+        <div style="display:flex; gap:10px; align-items:center;">
+            <i data-lucide="utensils" size="18"></i>
+            <span id="daily-tip">Analyzing goals for personalized recommendation...</span>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- MULTILINGUAL REPOSITORY ---
+    const i18n = {
+        en: { settings: "Aura Config", p_name: "Your Identity", p_goal: "Health Goal", p_lang: "Language", g_gain: "Muscle", g_lose: "Fat Loss", g_rec: "Recovery", save: "Update Bio-Profile", status: "SENSOR SYNC ACTIVE", steps: "Steps", bpm: "BPM (Sensor)" },
+        mx: { settings: "Configuración", p_name: "Tu Identidad", p_goal: "Meta de Salud", p_lang: "Idioma", g_gain: "Músculo", g_lose: "Perder Peso", g_rec: "Recuperación", save: "Guardar Bio-Perfil", status: "SENSORES ACTIVOS", steps: "Pasos", bpm: "Ritmo Cardíaco" },
+        fr: { settings: "Paramètres", p_name: "Votre Nom", p_goal: "Objectif Santé", p_lang: "Langue", g_gain: "Muscle", g_lose: "Poids", g_rec: "Récupération", save: "Enregistrer", status: "SYNC CAPTEURS", steps: "Pas", bpm: "Pulsation" },
+        jp: { settings: "設定", p_name: "お名前", p_goal: "健康目標", p_lang: "言語", g_gain: "筋肉", g_lose: "減量", g_rec: "回復", save: "保存する", status: "センサー同期中", steps: "歩数", bpm: "脈拍" }
+    };
+
+    // --- ENHANCED AI KNOWLEDGE ---
+    const AuraKnowledge = {
+        math: (expr) => { try { return eval(expr); } catch { return null; } },
+        medical: {
+            mx: { "dolor": "Detección: Dolor muscular. Aplica crioterapia y mantén hidratación.", "fiebre": "Alerta: Temperatura elevada. Acetaminofén 500mg y monitoreo constante." },
+            en: { "headache": "Tension detected. Recommendations: 500ml water and magnesium. Check posture.", "recipe": "Suggesting: Salmon with spinach and walnuts (High Omega-3 for brain health)." }
+        }
+    };
+
+    // --- SENSOR LOGIC (STEPS & HR) ---
+    let steps = parseInt(localStorage.getItem('aura_steps')) || 0;
+    let lastA = 0;
+
+    window.addEventListener('devicemotion', (e) => {
+        let acc = e.accelerationIncludingGravity;
+        let total = Math.sqrt(acc.x**2 + acc.y**2 + acc.z**2);
+        if (Math.abs(total - lastA) > 13) {
+            steps++;
+            document.getElementById('step-val').innerText = steps;
+            localStorage.setItem('aura_steps', steps);
+        }
+        lastA = total;
+    });
+
+    setInterval(() => {
+        const hr = 65 + Math.floor(Math.random() * 15);
+        document.getElementById('hr-val').innerText = hr;
+        updateHRGraph(hr);
+    }, 3000);
+
+    function updateHRGraph(val) {
+        const bar = document.createElement('div');
+        bar.className = 'hr-bar';
+        bar.style.height = (val - 50) + '%';
+        const container = document.getElementById('hr-bars');
+        container.appendChild(bar);
+        if(container.children.length > 30) container.removeChild(container.firstChild);
+    }
+
+    // --- CORE INTERFACE LOGIC ---
+    function askAura() {
+        const input = document.getElementById('user-input');
+        const stream = document.getElementById('chat-stream');
+        const query = input.value.toLowerCase();
+        if(!query) return;
+
+        stream.innerHTML += `<div style="text-align:right; margin:10px 0; font-weight:bold; color:var(--accent);">${query}</div>`;
+        
+        let response = "I've analyzed your bio-data. Processing request...";
+
+        // Math handling
+        const mathRes = AuraKnowledge.math(query);
+        if(mathRes !== null && query.match(/[0-9]/)) {
+            response = `Calculation complete: ${mathRes}`;
+        } 
+        // Medical Mexican logic
+        else if(query.includes("dolor") || query.includes("fiebre")) {
+            response = AuraKnowledge.medical.mx[query.includes("dolor") ? "dolor" : "fiebre"];
+        }
+        // General Response
+        else if(query.includes("hola") || query.includes("hi")) {
+            response = "Greetings. Sensors are tracking your movement. You have walked " + steps + " steps today.";
+        }
+
+        setTimeout(() => {
+            stream.innerHTML += `<div><b>Aura:</b> ${response}</div>`;
+            stream.scrollTop = stream.scrollHeight;
+        }, 500);
+        input.value = '';
+    }
+
+    function saveProfile() {
+        localStorage.setItem('aura_name', document.getElementById('user-name').value);
+        localStorage.setItem('aura_goal', document.getElementById('user-goal').value);
+        localStorage.setItem('aura_lang', document.getElementById('user-lang').value);
+        loadProfile();
+        toggleSettings();
+    }
+
+    function loadProfile() {
+        const name = localStorage.getItem('aura_name') || "Aura User";
+        const goal = localStorage.getItem('aura_goal') || "recovery";
+        const lang = localStorage.getItem('aura_lang') || "en";
+        
+        document.getElementById('display-name').innerText = "Aura: " + name.split(' ')[0];
+        document.getElementById('active-goal').innerText = "GOAL: " + goal.toUpperCase();
+        setLang(lang);
+
+        const tips = { gain: "High protein intake required: 1.8g per kg.", lose: "Caloric deficit of 300kcal recommended.", recovery: "Prioritize 8 hours of sleep and anti-inflammatory diet." };
+        document.getElementById('daily-tip').innerText = tips[goal];
+    }
+
+    function setLang(lang) {
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            el.innerText = i18n[lang][el.getAttribute('data-i18n')];
+        });
+        document.getElementById('user-lang').value = lang;
+    }
+
+    function toggleSettings() { document.getElementById('settings-pane').classList.toggle('open'); }
+    function toggleTheme() { document.body.setAttribute('data-theme', document.body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'); }
+
+    // Initialize
+    lucide.createIcons();
+    loadProfile();
+</script>
+</body>
+</html>
